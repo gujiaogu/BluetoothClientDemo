@@ -20,8 +20,7 @@ public class AcceptThread extends Thread {
 
     private static final String NAME = "BluetoothChatDemo";
     private static final UUID MY_UUID =
-            UUID.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66");
-    private static final String TAG_FIEL = "fileiscoming";
+            UUID.fromString("2b695c0a-e703-4167-875e-d230791fa275");
 
     private Handler mHandler;
     private BluetoothAdapter mAdapter;
@@ -30,31 +29,36 @@ public class AcceptThread extends Thread {
     private InputStream inputStream;
     private OutputStream outputStream;
     private boolean isCancel = false;
-    private boolean isFileComing = false;
-    private String cacheDir;
 
-    public AcceptThread(BluetoothAdapter adapter, Handler handler, String cacheDir) {
+    public AcceptThread(BluetoothAdapter adapter, Handler handler) {
         this.mAdapter = adapter;
         this.mHandler = handler;
-        this.cacheDir = cacheDir;
     }
 
     @Override
     public void run() {
         super.run();
+        if (mAdapter == null) {
+            return;
+        }
         try {
             mServerSocket = mAdapter.listenUsingRfcommWithServiceRecord(NAME, MY_UUID);
         } catch (IOException e) {
             e.printStackTrace();
             LogWrapper.d("监听失败");
+            cancel();
+            mHandler.obtainMessage(MainActivity.MESSAGE_RECEIVED_FAILED).sendToTarget();
             return;
         }
 
         try {
+            mHandler.obtainMessage(MainActivity.LISTENING).sendToTarget();
             mSocket = mServerSocket.accept();
         } catch (IOException e) {
             e.printStackTrace();
             LogWrapper.d("获取socket失败");
+            cancel();
+            mHandler.obtainMessage(MainActivity.MESSAGE_RECEIVED_FAILED).sendToTarget();
             return;
         }
 
@@ -63,37 +67,23 @@ public class AcceptThread extends Thread {
             outputStream = mSocket.getOutputStream();
         } catch (IOException e) {
             e.printStackTrace();
+            cancel();
+            mHandler.obtainMessage(MainActivity.MESSAGE_RECEIVED_FAILED).sendToTarget();
+            return;
         }
 
-        byte[] buffer = new byte[1024];
-        int n = 0;
+        byte[] buffer = null;
+        mHandler.obtainMessage(MainActivity.CONNECTION_SUCCESS).sendToTarget();
         while (!isCancel) {
+            buffer = new byte[1024];
             try {
-                if (isFileComing) {
-                    long timeStamp = System.currentTimeMillis();
-                    File file = new File(cacheDir + "/" + timeStamp + ".png");
-                    if (file.exists()) {
-                        file.delete();
-                    }
-                    file.createNewFile();
-                    FileOutputStream fos = new FileOutputStream(file);
-                    while ((n = inputStream.read(buffer, 0, buffer.length)) != -1) {
-                        fos.write(buffer, 0, n);
-                    }
-                    fos.flush();
-                    fos.close();
-                    mHandler.obtainMessage(MainActivity.FILE_RECEIVED, file.getAbsolutePath());
-                    isFileComing = false;
-                } else {
-                    inputStream.read(buffer);
-                    String result = new String(buffer).trim();
-                    if (TAG_FIEL.equals(result)) {
-                        isFileComing = true;
-                    } else {
-                        mHandler.obtainMessage(MainActivity.MESSAGE_RECEIVED, result).sendToTarget();
-                    }
-                }
+                inputStream.read(buffer);
+                String result = new String(buffer).trim();
+                mHandler.obtainMessage(MainActivity.MESSAGE_RECEIVED, result).sendToTarget();
             } catch (IOException e) {
+                isCancel = true;
+                mHandler.obtainMessage(MainActivity.MESSAGE_RECEIVED_FAILED).sendToTarget();
+                cancel();
                 e.printStackTrace();
             }
         }
@@ -113,5 +103,9 @@ public class AcceptThread extends Thread {
         StreamUtil.close(outputStream);
         StreamUtil.close(mSocket);
         StreamUtil.close(mServerSocket);
+        inputStream = null;
+        outputStream = null;
+        mSocket = null;
+        mServerSocket = null;
     }
 }

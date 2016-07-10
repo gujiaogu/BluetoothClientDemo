@@ -11,13 +11,18 @@
         android:layout_height="wrap_content"
         android:text="Hello World!"
         android:id="@+id/btn_test_send"
-        android:onClick="send"/>
+        android:onClick="send"
+        android:visibility="gone"/>
     <ImageView
         android:layout_width="100dp"
         android:layout_height="100dp"
         android:id="@+id/image"/>
-    <TextView
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:id="@+id/text"/>
+        android:layout_height="match_parent">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/text"/>
+    </ScrollView>
 </LinearLayout>
